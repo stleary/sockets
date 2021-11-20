@@ -176,17 +176,8 @@ int main(int argc, char *argv[]) {
   if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
     error("CLIENT: ERROR connecting");
   }
-  // Get input message from user
-  // printf("CLIENT: Enter text to send to the server, and then hit enter: ");
-  // Clear out the buffer array
-  // memset(buffer, '\0', sizeof(buffer));
-  // Get input from the user, trunc to buffer - 1 chars, leaving \0
-  // fgets(buffer, sizeof(buffer) - 1, stdin);
-  // Remove the trailing \n that fgets adds
-  // buffer[strcspn(buffer, "\n")] = '\0';
-  
-  // Send message to server
-  // Write to the server
+
+  // identify self to server
   strcpy(buffer, "enc");
   charsWritten = send(socketFD, buffer, strlen(buffer), 0);
   if (charsWritten < 0){
@@ -196,6 +187,7 @@ int main(int argc, char *argv[]) {
     printf("CLIENT: WARNING: Not all data written to socket!\n");
   }
 
+  // send len of plaintext
   sprintf(buffer, "%5d", plaintextLen);
   charsWritten = send(socketFD, buffer, strlen(buffer), 0);
   if (charsWritten < 0){
@@ -205,6 +197,33 @@ int main(int argc, char *argv[]) {
     printf("CLIENT: WARNING: Not all data written to socket!\n");
   }
 
+  // send plaintext
+  int len = plaintextLen;
+  char *ptr = plaintextBuf;
+  while (1) {
+    if (len <= 256) {
+      memcpy(buffer, ptr, len);
+      charsWritten = send(socketFD, buffer, len, 0);
+      if (charsWritten < 0){
+        error("CLIENT: ERROR writing to socket");
+      }
+      if (charsWritten < len){
+        printf("CLIENT: WARNING: Not all data written to socket!\n");
+      }
+      break;
+    } else {
+      memcpy(buffer, ptr, 256);
+      ptr += 256;
+      len -= 256;
+      charsWritten = send(socketFD, buffer, 256, 0);
+      if (charsWritten < 0){
+        error("CLIENT: ERROR writing to socket");
+      }
+      if (charsWritten < 256){
+        printf("CLIENT: WARNING: Not all data written to socket!\n");
+      }
+    }
+  }
 
   
   // Get return message from server

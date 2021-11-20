@@ -108,13 +108,34 @@ int main(int argc, char *argv[]){
     if (charsRead < 0){
       error("ERROR reading from socket");
     }
-    int len = atoi(buffer);
-    if (len == 0) {
+    int textFileLen = atoi(buffer);
+    if (textFileLen == 0) {
       fprintf(stderr, "invalid length: %s\n", buffer);
       exit(0);
     }
-    printf("SERVER: I received this from the client: \"%d\"\n", len);
+    printf("SERVER: I received this from the client: \"%d\"\n", textFileLen);
   
+    char *textFileBuffer = calloc(textFileLen, sizeof(char));
+    char *ptr = textFileBuffer;
+    int len = textFileLen;
+    while (1) {
+      if (len <= 256) {
+        charsRead = recv(connectionSocket, ptr, len, 0);
+        if (charsRead < 0){
+          error("ERROR reading from socket");
+        }       
+        break;
+      } else {
+        charsRead = recv(connectionSocket, ptr, len, 0);
+        if (charsRead < 0){
+          error("ERROR reading from socket");
+        }       
+        ptr += 256;
+        len -= 256;
+      }      
+    }
+
+    printf("textFile: %s\n", textFileBuffer);
 
     // Send a Success message back to the client
     charsRead = send(connectionSocket,
