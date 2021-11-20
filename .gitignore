@@ -5,3 +5,5 @@ server
 enc_client
 mykey.txt
 plaintext.txt
+nohup.out
+enc_server

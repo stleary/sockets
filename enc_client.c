@@ -171,26 +171,23 @@ int main(int argc, char *argv[]) {
   // printf("len: %d\n", keyLen);
   // printf("file: %s\n", keyBuf);
 
-
-
-  return(0);
-
   
   // Connect to server
   if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
     error("CLIENT: ERROR connecting");
   }
   // Get input message from user
-  printf("CLIENT: Enter text to send to the server, and then hit enter: ");
+  // printf("CLIENT: Enter text to send to the server, and then hit enter: ");
   // Clear out the buffer array
-  memset(buffer, '\0', sizeof(buffer));
+  // memset(buffer, '\0', sizeof(buffer));
   // Get input from the user, trunc to buffer - 1 chars, leaving \0
-  fgets(buffer, sizeof(buffer) - 1, stdin);
+  // fgets(buffer, sizeof(buffer) - 1, stdin);
   // Remove the trailing \n that fgets adds
-  buffer[strcspn(buffer, "\n")] = '\0';
+  // buffer[strcspn(buffer, "\n")] = '\0';
   
   // Send message to server
   // Write to the server
+  strcpy(buffer, "enc");
   charsWritten = send(socketFD, buffer, strlen(buffer), 0);
   if (charsWritten < 0){
     error("CLIENT: ERROR writing to socket");
@@ -198,6 +195,17 @@ int main(int argc, char *argv[]) {
   if (charsWritten < strlen(buffer)){
     printf("CLIENT: WARNING: Not all data written to socket!\n");
   }
+
+  sprintf(buffer, "%5d", plaintextLen);
+  charsWritten = send(socketFD, buffer, strlen(buffer), 0);
+  if (charsWritten < 0){
+    error("CLIENT: ERROR writing to socket");
+  }
+  if (charsWritten < strlen(buffer)){
+    printf("CLIENT: WARNING: Not all data written to socket!\n");
+  }
+
+
   
   // Get return message from server
   // Clear out the buffer again for reuse
