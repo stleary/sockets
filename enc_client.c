@@ -6,6 +6,12 @@
 #include <sys/socket.h> // send(),recv()
 #include <netdb.h>      // gethostbyname()
  
+
+#define ENCRYPT 1
+#define DECRYPT 0
+
+#define DIRECTION ENCRYPT
+
 /**
 * encrypting Client code
 * usage: enc_client plaintextFile keyFile encServerPort
@@ -118,12 +124,104 @@ int readFile(char *filename, char **bufferptr, int *len) {
       return 0;
     }
   }
-
-
-
   return (1);
 }
- 
+
+
+
+// read a file over the socket.
+// return 1 on success, otherwise 0
+int readFileSocket(int connectionSocket, char **bufferPtr, int *fileLen) {
+
+  char buffer[256];
+  // Get the file len
+  memset(buffer, '\0', 256);
+  // Read the client's message from the socket
+  int charsRead = recv(connectionSocket, buffer, 5, 0);
+  if (charsRead < 0){
+    fprintf(stderr, "ERROR reading from socket");
+    return (0);
+  }
+  *fileLen = atoi(buffer);
+  if (*fileLen == 0) {
+    fprintf(stderr, "invalid length: %s\n", buffer);
+    return (0);
+  }
+  printf("SERVER: I received this from the client: \"%d\"\n", *fileLen);
+
+  *bufferPtr = calloc(*fileLen, sizeof(char));
+  char *ptr = *bufferPtr;
+  int len = *fileLen;
+  while (1) {
+    if (len <= 256) {
+      charsRead = recv(connectionSocket, ptr, len, 0);
+      if (charsRead < 0){
+        error("ERROR reading from socket");
+      }       
+      break;
+    } else {
+      charsRead = recv(connectionSocket, ptr, 256, 0);
+      if (charsRead < 0){
+        error("ERROR reading from socket");
+      }       
+      ptr += 256;
+      len -= 256;
+    }      
+  }
+  return (1);
+}
+
+
+// writes a file 256 bytes at a time
+// return 1 if successful,  otherwise 0
+int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
+
+
+  // send len of file
+  char buffer[256];
+  sprintf(buffer, "%5d", fileLen);
+  int charsWritten = send(socketFD, buffer, strlen(buffer), 0);
+  if (charsWritten < 0){
+    fprintf(stderr, "CLIENT: ERROR writing to socket");
+    return (0);
+  }
+  if (charsWritten < strlen(buffer)){
+    printf("CLIENT: WARNING: Not all data written to socket!\n");
+  }
+
+  // send file
+  int len = fileLen;
+  char *ptr = fileBuf;
+  while (1) {
+    if (len <= 256) {
+      memcpy(buffer, ptr, len);
+      charsWritten = send(socketFD, buffer, len, 0);
+      if (charsWritten < 0){
+        fprintf(stderr, "CLIENT: ERROR writing to socket");
+        return (0);
+      }
+      if (charsWritten < len){
+        printf("CLIENT: WARNING: Not all data written to socket!\n");
+      }
+      break;
+    } else {
+      memcpy(buffer, ptr, 256);
+      ptr += 256;
+      len -= 256;
+      charsWritten = send(socketFD, buffer, 256, 0);
+      if (charsWritten < 0){
+        fprintf(stderr, "CLIENT: ERROR writing to socket");
+        return (0);
+      }
+      if (charsWritten < 256){
+        printf("CLIENT: WARNING: Not all data written to socket!\n");
+      }
+    }
+  }
+  return(1);
+}
+
+
 int main(int argc, char *argv[]) {
   int socketFD, portNumber, charsWritten, charsRead;
   struct sockaddr_in serverAddress;
@@ -131,7 +229,11 @@ int main(int argc, char *argv[]) {
 
   // Check args
   if (argc != 4) {
-    fprintf(stderr,"USAGE: enc_client plaintextFile keyFile serverPort\n");
+    if (DIRECTION == ENCRYPT) {
+      fprintf(stderr,"USAGE: enc_client plaintextFile keyFile serverPort\n");
+    } else {
+      fprintf(stderr,"USAGE: dec_client encryptedFile keyFile serverPort\n");
+    }
     exit(1);
   }
 
@@ -158,8 +260,6 @@ int main(int argc, char *argv[]) {
   if (result == 0) {
     exit(1);
   }
-  // printf("len: %d\n", plaintextLen);
-  // printf("file: %s\n", plaintextBuf);
  
 
   char *keyFile = argv[2];
@@ -168,8 +268,10 @@ int main(int argc, char *argv[]) {
   if (result == 0) {
     exit(1);
   }
-  // printf("len: %d\n", keyLen);
-  // printf("file: %s\n", keyBuf);
+
+  if (keyLen < plaintextLen) {
+    error("Key is too short for text\n");
+  }
 
   
   // Connect to server
@@ -178,7 +280,11 @@ int main(int argc, char *argv[]) {
   }
 
   // identify self to server
-  strcpy(buffer, "enc");
+  if (DIRECTION == ENCRYPT) {
+    strcpy(buffer, "enc");
+  } else {
+    strcpy(buffer, "enc");
+  }
   charsWritten = send(socketFD, buffer, strlen(buffer), 0);
   if (charsWritten < 0){
     error("CLIENT: ERROR writing to socket");
@@ -187,54 +293,26 @@ int main(int argc, char *argv[]) {
     printf("CLIENT: WARNING: Not all data written to socket!\n");
   }
 
-  // send len of plaintext
-  sprintf(buffer, "%5d", plaintextLen);
-  charsWritten = send(socketFD, buffer, strlen(buffer), 0);
-  if (charsWritten < 0){
-    error("CLIENT: ERROR writing to socket");
-  }
-  if (charsWritten < strlen(buffer)){
-    printf("CLIENT: WARNING: Not all data written to socket!\n");
+  result = sendFileSocket(socketFD, plaintextBuf, plaintextLen);
+  if (result == 0) {
+    error("Unable to send plaintext file");
   }
 
-  // send plaintext
-  int len = plaintextLen;
-  char *ptr = plaintextBuf;
-  while (1) {
-    if (len <= 256) {
-      memcpy(buffer, ptr, len);
-      charsWritten = send(socketFD, buffer, len, 0);
-      if (charsWritten < 0){
-        error("CLIENT: ERROR writing to socket");
-      }
-      if (charsWritten < len){
-        printf("CLIENT: WARNING: Not all data written to socket!\n");
-      }
-      break;
-    } else {
-      memcpy(buffer, ptr, 256);
-      ptr += 256;
-      len -= 256;
-      charsWritten = send(socketFD, buffer, 256, 0);
-      if (charsWritten < 0){
-        error("CLIENT: ERROR writing to socket");
-      }
-      if (charsWritten < 256){
-        printf("CLIENT: WARNING: Not all data written to socket!\n");
-      }
-    }
+  result = sendFileSocket(socketFD, keyBuf, keyLen);
+  if (result == 0) {
+    error("Unable to send key file");
   }
 
   
-  // Get return message from server
-  // Clear out the buffer again for reuse
-  memset(buffer, '\0', sizeof(buffer));
-  // Read data from the socket, leaving \0 at end
-  charsRead = recv(socketFD, buffer, sizeof(buffer) - 1, 0);
-  if (charsRead < 0){
-    error("CLIENT: ERROR reading from socket");
+  char *responseFilePtr = 0;
+  int responseTextLen = 0;
+  result = readFileSocket(socketFD, &responseFilePtr, &responseTextLen);
+  if (result == 0) {
+    fprintf(stderr, "unable to read input file\n");
+    exit(0);
   }
-  printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
+  printf("response File: %s\n", responseFilePtr);
+  free(responseFilePtr);
   
   // Close the socket
   close(socketFD);

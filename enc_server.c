@@ -7,6 +7,10 @@
 #include <netinet/in.h> 
 #include <sys/wait.h> 
 
+#define ENCRYPT 1
+#define DECRYPT 0
+
+#define DIRECTION ENCRYPT
  
 // Error function used for reporting issues
 void error(const char *msg) {
@@ -27,7 +31,139 @@ void setupAddressStruct(struct sockaddr_in* address,
  // Allow a client at any address to connect to this server
  address->sin_addr.s_addr = INADDR_ANY;
 }
- 
+
+// read a file over the socket.
+// return 1 on success, otherwise 0
+int readFileSocket(int connectionSocket, char **bufferPtr, int *fileLen) {
+
+  char buffer[256];
+  // Get the file len
+  memset(buffer, '\0', 256);
+  // Read the client's message from the socket
+  int charsRead = recv(connectionSocket, buffer, 5, 0);
+  if (charsRead < 0){
+    fprintf(stderr, "ERROR reading from socket");
+    return (0);
+  }
+  *fileLen = atoi(buffer);
+  if (*fileLen == 0) {
+    fprintf(stderr, "invalid length: %s\n", buffer);
+    return (0);
+  }
+  printf("SERVER: I received this from the client: \"%d\"\n", *fileLen);
+
+  *bufferPtr = calloc(*fileLen, sizeof(char));
+  char *ptr = *bufferPtr;
+  int len = *fileLen;
+  while (1) {
+    if (len <= 256) {
+      charsRead = recv(connectionSocket, ptr, len, 0);
+      if (charsRead < 0){
+        error("ERROR reading from socket");
+      }       
+      break;
+    } else {
+      charsRead = recv(connectionSocket, ptr, 256, 0);
+      if (charsRead < 0){
+        error("ERROR reading from socket");
+      }       
+      ptr += 256;
+      len -= 256;
+    }      
+  }
+  return (1);
+}
+
+
+
+// writes a file 256 bytes at a time
+// return 1 if successful,  otherwise 0
+int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
+
+
+  // send len of file
+  char buffer[256];
+  sprintf(buffer, "%5d", fileLen);
+  int charsWritten = send(socketFD, buffer, strlen(buffer), 0);
+  if (charsWritten < 0){
+    fprintf(stderr, "CLIENT: ERROR writing to socket");
+    return (0);
+  }
+  if (charsWritten < strlen(buffer)){
+    printf("CLIENT: WARNING: Not all data written to socket!\n");
+  }
+
+  // send file
+  int len = fileLen;
+  char *ptr = fileBuf;
+  while (1) {
+    if (len <= 256) {
+      memcpy(buffer, ptr, len);
+      charsWritten = send(socketFD, buffer, len, 0);
+      if (charsWritten < 0){
+        fprintf(stderr, "CLIENT: ERROR writing to socket");
+        return (0);
+      }
+      if (charsWritten < len){
+        printf("CLIENT: WARNING: Not all data written to socket!\n");
+      }
+      break;
+    } else {
+      memcpy(buffer, ptr, 256);
+      ptr += 256;
+      len -= 256;
+      charsWritten = send(socketFD, buffer, 256, 0);
+      if (charsWritten < 0){
+        fprintf(stderr, "CLIENT: ERROR writing to socket");
+        return (0);
+      }
+      if (charsWritten < 256){
+        printf("CLIENT: WARNING: Not all data written to socket!\n");
+      }
+    }
+  }
+  return(1);
+}
+
+// encyphers or decpyhers text
+void cypher(char *textPtr, char *keyPtr, char*cypherPtr, int len, int direction) {
+
+  for (int i = 0; i < len; ++i) {
+    char c = 0;
+    char cText = textPtr[i];
+    if (cText == ' ') {
+      cText = 26;
+    } else {
+      cText -= 'A';
+    }
+    char cCypher = keyPtr[i];
+    if (cCypher == ' ') {
+      cCypher = 26;
+    } else {
+      cCypher -= 'A';
+    }
+
+    if (direction == ENCRYPT) {
+      c = (cText + cCypher) % 27;
+    } else {
+      // DECRYPT
+      c = (cText - cCypher);
+      if (c < 0) {
+        c += 26;
+      }
+    }
+
+    if (c == 26) {
+      c = ' ';
+    } else {
+      c += 'A';
+    }
+    cypherPtr[i] = c;
+  }
+}
+
+
+
 int main(int argc, char *argv[]){
  int connectionSocket, charsRead;
  char buffer[256];
@@ -100,51 +236,38 @@ int main(int argc, char *argv[]){
       exit(0);
     }
     printf("SERVER: I received this from the client: \"%s\"\n", buffer);
-  
-   // Get the message from the client and display it
-    memset(buffer, '\0', 256);
-    // Read the client's message from the socket
-    charsRead = recv(connectionSocket, buffer, 5, 0);
-    if (charsRead < 0){
-      error("ERROR reading from socket");
-    }
-    int textFileLen = atoi(buffer);
-    if (textFileLen == 0) {
-      fprintf(stderr, "invalid length: %s\n", buffer);
+
+    char *textFilePtr = 0;
+    int textLen = 0;
+    int result = readFileSocket(connectionSocket, &textFilePtr, &textLen);
+    if (result == 0) {
+      fprintf(stderr, "unable to read input file\n");
       exit(0);
     }
-    printf("SERVER: I received this from the client: \"%d\"\n", textFileLen);
-  
-    char *textFileBuffer = calloc(textFileLen, sizeof(char));
-    char *ptr = textFileBuffer;
-    int len = textFileLen;
-    while (1) {
-      if (len <= 256) {
-        charsRead = recv(connectionSocket, ptr, len, 0);
-        if (charsRead < 0){
-          error("ERROR reading from socket");
-        }       
-        break;
-      } else {
-        charsRead = recv(connectionSocket, ptr, len, 0);
-        if (charsRead < 0){
-          error("ERROR reading from socket");
-        }       
-        ptr += 256;
-        len -= 256;
-      }      
+    printf("textFile: %s\n", textFilePtr);
+
+    char *keyFilePtr = 0;
+    int keyLen = 0;
+    result = readFileSocket(connectionSocket, &keyFilePtr, &keyLen);
+    if (result == 0) {
+      fprintf(stderr, "unable to read input file\n");
+      exit(0);
+    }
+    printf("keyFile: %s\n", keyFilePtr);
+
+
+    // todo still need to perform a cypher operation
+    char *cypherTextPtr = calloc(textLen, sizeof(char));
+    cypher(textFilePtr, keyFilePtr, cypherTextPtr, textLen, DIRECTION);
+
+    result = sendFileSocket(connectionSocket, cypherTextPtr, textLen);
+    if (result == 0) {
+      error("Unable to send cypher file");
     }
 
-    printf("textFile: %s\n", textFileBuffer);
-
-    // Send a Success message back to the client
-    charsRead = send(connectionSocket,
-                    "I am the server, and I got your message", 39, 0);
-    if (charsRead < 0){
-      error("ERROR writing to socket");
-    }
     // Close the connection socket for this client
     close(connectionSocket);
+    printf("terminating child\n");
     exit(0);
   }
  }
