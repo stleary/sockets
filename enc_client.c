@@ -21,11 +21,17 @@
 * exit 1 on input error, 2 on wrong server, otherwise 0.
 */
  
+char *plaintextBuf = 0;
+char *keyBuf = 0;
+
+
 
 // Error function used for reporting issues
 void error(const char *msg) {
  perror(msg);
- exit(0);
+ free(plaintextBuf);
+ free(keyBuf);
+ exit(1);
 }
  
  
@@ -94,6 +100,27 @@ int readFile(char *filename, char **bufferptr, int *len) {
   /* copy all the text into the buffer */
   fread(*bufferptr, sizeof(char), *len, infile);
   fclose(infile);
+
+  // strip newline, if found
+  if ((*bufferptr)[*len - 1] == '\n') {
+    (*bufferptr)[*len - 1] = 0;
+    *len = *len - 1;
+  } else {
+    fprintf(stderr, "Expected %s to end with a newline\n", filename);
+    return 0;
+  }
+
+  // validate input
+
+  for (int i = 0; i < *len; ++i) {
+    if ((*bufferptr)[i] != ' ' && ((*bufferptr)[i] < 'A' || (*bufferptr)[i] > 'Z')) {
+      fprintf(stderr, "Invalid char found in %s: %c\n", filename, (*bufferptr)[i]);
+      return 0;
+    }
+  }
+
+
+
   return (1);
 }
  
@@ -107,37 +134,13 @@ int main(int argc, char *argv[]) {
     fprintf(stderr,"USAGE: enc_client plaintextFile keyFile serverPort\n");
     exit(1);
   }
-  
-  char *plaintextFile = argv[1];
-  char *plaintextBuf = 0;
-  int plaintextLen = 0;
-  int result = readFile(plaintextFile, &plaintextBuf, &plaintextLen);
-  if (result == 0) {
-    exit(1);
-  }
-  // printf("len: %d\n", plaintextLen);
-  // printf("file: %s\n", plaintextBuf);
-  free(plaintextBuf);
 
-  char *keyFile = argv[2];
-  char *keyBuf = 0;
-  int keyLen = 0;
-  result = readFile(keyFile, &keyBuf, &keyLen);
-  if (result == 0) {
-    exit(1);
-  }
-  printf("len: %d\n", keyLen);
-  printf("file: %s\n", keyBuf);
-  free(keyBuf);
-
+ 
   int port = atoi(argv[3]);
   if (port == 0) {
     fprintf(stderr, "Invalid port: %s\n", argv[3]);
     exit(1);
   }
-
-
-  return(0);
 
   // Create a socket
   socketFD = socket(AF_INET, SOCK_STREAM, 0);
@@ -146,7 +149,32 @@ int main(int argc, char *argv[]) {
   }
   
     // Set up the server address struct
-  setupAddressStruct(&serverAddress, atoi(argv[2]), argv[1]);
+  setupAddressStruct(&serverAddress, port, "localhost");
+
+
+  char *plaintextFile = argv[1];
+  int plaintextLen = 0;
+  int result = readFile(plaintextFile, &plaintextBuf, &plaintextLen);
+  if (result == 0) {
+    exit(1);
+  }
+  // printf("len: %d\n", plaintextLen);
+  // printf("file: %s\n", plaintextBuf);
+ 
+
+  char *keyFile = argv[2];
+  int keyLen = 0;
+  result = readFile(keyFile, &keyBuf, &keyLen);
+  if (result == 0) {
+    exit(1);
+  }
+  // printf("len: %d\n", keyLen);
+  // printf("file: %s\n", keyBuf);
+
+
+
+  return(0);
+
   
   // Connect to server
   if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
@@ -183,6 +211,10 @@ int main(int argc, char *argv[]) {
   
   // Close the socket
   close(socketFD);
+
+  free(plaintextBuf);
+  free(keyBuf);
+
   return 0;
 }
 
