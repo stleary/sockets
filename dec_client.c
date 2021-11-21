@@ -147,7 +147,7 @@ int readFileSocket(int connectionSocket, char **bufferPtr, int *fileLen) {
     fprintf(stderr, "invalid length: %s\n", buffer);
     return (0);
   }
-  printf("SERVER: I received this from the client: \"%d\"\n", *fileLen);
+  // printf("SERVER: I received this from the client: \"%d\"\n", *fileLen);
 
   *bufferPtr = calloc(*fileLen, sizeof(char));
   char *ptr = *bufferPtr;
@@ -186,7 +186,7 @@ int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
     return (0);
   }
   if (charsWritten < strlen(buffer)){
-    printf("CLIENT: WARNING: Not all data written to socket!\n");
+    fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
   }
 
   // send file
@@ -201,7 +201,7 @@ int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
         return (0);
       }
       if (charsWritten < len){
-        printf("CLIENT: WARNING: Not all data written to socket!\n");
+        fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
       }
       break;
     } else {
@@ -214,7 +214,7 @@ int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
         return (0);
       }
       if (charsWritten < 256){
-        printf("CLIENT: WARNING: Not all data written to socket!\n");
+        fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
       }
     }
   }
@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR writing to socket");
   }
   if (charsWritten < strlen(buffer)){
-    printf("CLIENT: WARNING: Not all data written to socket!\n");
+    fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
   }
 
   result = sendFileSocket(socketFD, plaintextBuf, plaintextLen);
@@ -311,7 +311,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "unable to read input file\n");
     exit(0);
   }
-  printf("response File: %s\n", responseFilePtr);
+  printf("%s\n", responseFilePtr);
   free(responseFilePtr);
   
   // Close the socket

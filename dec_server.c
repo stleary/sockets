@@ -50,7 +50,7 @@ int readFileSocket(int connectionSocket, char **bufferPtr, int *fileLen) {
     fprintf(stderr, "invalid length: %s\n", buffer);
     return (0);
   }
-  printf("SERVER: I received this from the client: \"%d\"\n", *fileLen);
+  // printf("SERVER: I received this from the client: \"%d\"\n", *fileLen);
 
   *bufferPtr = calloc(*fileLen, sizeof(char));
   char *ptr = *bufferPtr;
@@ -90,7 +90,7 @@ int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
     return (0);
   }
   if (charsWritten < strlen(buffer)){
-    printf("CLIENT: WARNING: Not all data written to socket!\n");
+    fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
   }
 
   // send file
@@ -105,7 +105,7 @@ int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
         return (0);
       }
       if (charsWritten < len){
-        printf("CLIENT: WARNING: Not all data written to socket!\n");
+        fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
       }
       break;
     } else {
@@ -118,7 +118,7 @@ int sendFileSocket(int socketFD, char *fileBuf, int fileLen) {
         return (0);
       }
       if (charsWritten < 256){
-        printf("CLIENT: WARNING: Not all data written to socket!\n");
+        fprintf(stderr, "CLIENT: WARNING: Not all data written to socket!\n");
       }
     }
   }
@@ -219,9 +219,9 @@ int main(int argc, char *argv[]){
   else 
   {
 
-    printf("SERVER: Connected to client running at host %d port %d\n",
-                          ntohs(clientAddress.sin_addr.s_addr),
-                          ntohs(clientAddress.sin_port));
+    // printf("SERVER: Connected to client running at host %d port %d\n",
+    //                       ntohs(clientAddress.sin_addr.s_addr),
+    //                       ntohs(clientAddress.sin_port));
   
     // client name
     memset(buffer, '\0', 256);
@@ -234,7 +234,7 @@ int main(int argc, char *argv[]){
       fprintf(stderr, "Not a client, hanging up: %s\n", buffer);
       exit(0);
     }
-    printf("SERVER: I received this from the client: \"%s\"\n", buffer);
+    // printf("SERVER: I received this from the client: \"%s\"\n", buffer);
 
     char *textFilePtr = 0;
     int textLen = 0;
@@ -243,7 +243,7 @@ int main(int argc, char *argv[]){
       fprintf(stderr, "unable to read input file\n");
       exit(0);
     }
-    printf("textFile: %s\n", textFilePtr);
+    // printf("textFile: %s\n", textFilePtr);
 
     char *keyFilePtr = 0;
     int keyLen = 0;
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]){
       fprintf(stderr, "unable to read input file\n");
       exit(0);
     }
-    printf("keyFile: %s\n", keyFilePtr);
+    // printf("keyFile: %s\n", keyFilePtr);
 
 
     // todo still need to perform a cypher operation
@@ -266,7 +266,7 @@ int main(int argc, char *argv[]){
 
     // Close the connection socket for this client
     close(connectionSocket);
-    printf("terminating child\n");
+    // printf("terminating child\n");
     exit(0);
   }
  }
