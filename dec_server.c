@@ -149,7 +149,7 @@ void cypher(char *textPtr, char *keyPtr, char*cypherPtr, int len, int direction)
       // DECRYPT
       c = (cText - cCypher);
       if (c < 0) {
-        c += 26;
+        c += 27;
       }
     }
 
@@ -161,7 +161,6 @@ void cypher(char *textPtr, char *keyPtr, char*cypherPtr, int len, int direction)
     cypherPtr[i] = c;
   }
 }
-
 
 
 int main(int argc, char *argv[]){
